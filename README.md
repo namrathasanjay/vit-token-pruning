@@ -61,14 +61,23 @@ median of per-round ratios), because single-shot T4 timings drifted by ~10%.
   K = 0 skips it.
 - Sequence length after block 6 is checked directly: 197 / 178 / 139 / 99 tokens at 0 / 10 / 30 / 50%.
 
-## Exploratory: LoRA recovery
+## Exploratory: does LoRA recover the lost accuracy?
 
 LoRA (r=8) on blocks 7–11, trained at block 6 / 50% dropped, then merged into the weights (no speed
 cost: 1.236× after merging). A naive before/after shows "+11 points", but that compares a model
-fine-tuned on Imagenette's 10 classes with the frozen zero-shot classifier. A controlled run (same
-training without pruning, evaluated under pruning) puts the pruning-specific benefit at **~0.23 points**.
-An open issue in that experiment is documented at the end of notebook 03, so treat this part as
-preliminary.
+fine-tuned on Imagenette's 10 classes with the frozen zero-shot classifier. A **control run** trains
+the same recipe without pruning and is evaluated under the same 50% pruning:
+
+| LoRA training | Evaluated at 50% dropped |
+|---|---:|
+| "with" 50% dropped (notebook 03) | 99.59% |
+| without pruning (control, notebook 04) | 99.62% |
+
+**No pruning-specific benefit was observed** (−0.03 points): after any fine-tuning, this 10-class task
+is easy enough that pruning barely matters (the control loses 0.13 points when pruning is switched on).
+One caveat makes the test weaker than intended: the evidence in notebook 03 (pre-training accuracy
+equal to the unpruned model, epochs no faster than the control's) suggests pruning was not active while
+that run trained. The fix and re-run are listed in Next steps.
 
 ## Repository layout
 
@@ -76,7 +85,8 @@ preliminary.
 notebooks/
   01_scoring_and_wrapper.ipynb          # attention hook, CLS scoring, PrunedViT, correctness (CPU is enough)
   02_benchmark_and_sweep.ipynb          # FLOPs, latency, profiler, full 3 x 4 sweep on the val set (T4)
-  03_lora_recovery_exploratory.ipynb    # LoRA on post-prune blocks, merge, controlled comparison (T4)
+  03_lora_recovery_exploratory.ipynb    # LoRA on post-prune blocks trained at 50% dropped, merged (T4)
+  04_lora_control.ipynb                 # control: same LoRA trained without pruning, evaluated pruned (T4)
 assets/                                 # figures used in this README
 requirements.txt
 ```
@@ -87,7 +97,8 @@ requirements.txt
   scoring versus simply running a shorter sequence. This is the most important missing control.
 - One GPU (T4) in fp32; fp16/bf16 with tensor cores would change the baseline and the batch-1 picture.
 - Blocks 3, 6 and 9 only; fixed drop rates; a 10-class evaluation set.
-- Next: random-pruning control, `torch.compile` / CUDA graphs at batch 1, fp16, blocks 4–8, full
+- Next: assert the post-block-6 sequence length inside the LoRA training loop and re-run it, ideally at block 3 / 70%
+  where the frozen gap (7.85 points) leaves room for an effect; random-pruning control, `torch.compile` / CUDA graphs at batch 1, fp16, blocks 4–8, full
   ImageNet-1k, and combining pruning with INT8 quantization.
 
 ## Tech
