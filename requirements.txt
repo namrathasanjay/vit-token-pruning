@@ -1,0 +1,9 @@
+# Tested on Google Colab (T4), torch 2.11, timm 1.0.30
+torch
+torchvision
+timm
+numpy
+pandas
+matplotlib
+pillow
+peft            # notebook 03 only; run `pip uninstall -y torchao` first on Colab
